@@ -22,12 +22,13 @@ static void vHeartbeatTask(void *pvParameters)
     // Frequency running from: 200 500 1000
     int type_of_freq[3] = {200, 500, 1000};
     int freq_counter = 0;
-    uint32_t start_time = HAL_GetTick();
+    uint32_t start_time = xTaskGetTickCount();
     for(;;)
     {   
         //change the freq after 5 seconds
-        if (HAL_GetTicks()%5000 == 0) {
+        if (xTaskGetTickCount() - start_time >= 5000) {
             freq_counter = (freq_counter + 1) % 3;
+	    start_time = xTaskGetTickCount();
         }
         HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
         vTaskDelay(pdMS_TO_TICKS(type_of_freq[freq_counter]));
