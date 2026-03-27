@@ -2,8 +2,30 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
+#define LED_PIN GPIO_PIN_7
+#define BUTTON_PIN GPIO_PIN_0
+
+UART_HandleTypeDef huart1;
+
+//Queue handle for testing purposes
+QueueHandle_t xQueue;
+// Mutex for Logging
+xSemaphoreHandle_t xLogMutex;
+xSemaphoreHandle_t xLEDTimerMutex; // Mutex for LED timer
+// Binary Semaphore for button press
+SemaphoreHandle_t xButtonSemaphore;
+// Timer for blinking LED handle
+xTimerHandle_t xBlinkTimer;
+// Timer for button debouncing (if needed in the future)
+xTimeHandle_t xDebounceTimer;
+
+
+
 /* Forward declaration for the application's main entry */
 extern void app_main(void);
+
+// Binary semaphore for button press (if needed in the future)
+// xSemaphoreHandle xButtonSemaphore;
 
 /**
   * @brief  The hardware entry point.
@@ -18,10 +40,19 @@ int main(void)
   /* Configure the system clock to 72MHz (Standard for STM32F103) */
   SystemClock_Config();
 
+  // Init uart
+  MX_UART1_UART_Init();
   /* Initialize all configured peripherals */
   /* In production, UARTs, I2Cs, SPIs etc. are initialized here or in app_main() */
 
   /* Call the application-specific setup */
+  // Create a queue to hold 2 integers
+  xQueue = xQueueCreate(2, sizeof(int));
+  // Create a mutex for logging 
+  xLogMutex = xSemaphoreCreateMutex(); 
+  // Create a binary semaphore for button
+  xButtonSemaphore = xSemaphoreCreateBinary();
+  xLEDTimerMutex = xSemaphoreCreateBinary(); // Mutex for LED timer
   app_main();
 
   /* Start the FreeRTOS scheduler */
@@ -34,6 +65,74 @@ int main(void)
 }
 
 /**
+ * UART setting init function (for debugging purposes) 
+ */
+static void MX_USART1_UART_Init(void)
+{
+  /* Standard UART initialization code for STM32F103 */
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 115200;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/** 
+ * @brief GPIO init config
+ * @param None
+ * Config the GPIO pins with IRQ enabled for button input (if needed in the future) 
+ */
+static void MX_GPIO_Init(void){
+
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+  /* GPIO Port A clock enable */
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin : GPIO_PIN_0 (PA0) */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : LOCK_Pin BUT_LED_Pin BUZZ_Pin */
+  GPIO_InitStruct.Pin  = LED_PIN;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+}
+
+ /**
+  * @brief GPIO EXTI Callback (for handling external interrupts, e.g., buttons)
+  * @param GPIO_Pin: The pin number that triggered the interrupt
+  * @retval Non
+  */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  // Modify the semaphore binary
+  if(GPIO_Pin == GPIO_PIN_0) {
+    //set the binary semopho | Give semapho
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xSemaphoreGiveFromISR(xButtonSemaphore, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+  }
+
+}
+
+/**
   * @brief System Clock Configuration
   * @retval None
   */
@@ -42,6 +141,20 @@ void SystemClock_Config(void)
   /* Standard 72MHz configuration for STM32F103-C8-T6 (Blue Pill) */
   /* In a real project, this would include PLL, HSE, and HCLK settings */
 }
+// No need for receiving for now cause nothing get to recive, but this is how it would look like if we want to use it in the future
+// void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size){
+// 	// LOG UART Handle
+// 	if (huart->Instance == USART1) {
+// 		if(Size < UART_RX_BUFFER_SIZE)
+// 		{
+// 			LOG_buffer[Size] = '\0';
+// 		} else {
+// 			LOG_buffer[UART_RX_BUFFER_SIZE - 1] = '\0';
+// 		}
+// 		LOG_DataValid = true;
+// 		HAL_UARTEx_ReceiveToIdle_IT(&huart1, LOG_buffer, UART_RX_BUFFER_SIZE);
+// 	}
+// }
 
 /**
   * @brief  Error Handler
