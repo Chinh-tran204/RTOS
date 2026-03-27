@@ -4,21 +4,9 @@
 
 #define LED_PIN GPIO_PIN_7
 #define BUTTON_PIN GPIO_PIN_0
+#define BUILTIN_LED_PIN GPIO_PIN_13
 
 UART_HandleTypeDef huart1;
-
-//Queue handle for testing purposes
-QueueHandle_t xQueue;
-// Mutex for Logging
-xSemaphoreHandle_t xLogMutex;
-xSemaphoreHandle_t xLEDTimerMutex; // Mutex for LED timer
-// Binary Semaphore for button press
-SemaphoreHandle_t xButtonSemaphore;
-// Timer for blinking LED handle
-xTimerHandle_t xBlinkTimer;
-// Timer for button debouncing (if needed in the future)
-xTimeHandle_t xDebounceTimer;
-
 
 
 /* Forward declaration for the application's main entry */
@@ -46,13 +34,6 @@ int main(void)
   /* In production, UARTs, I2Cs, SPIs etc. are initialized here or in app_main() */
 
   /* Call the application-specific setup */
-  // Create a queue to hold 2 integers
-  xQueue = xQueueCreate(2, sizeof(int));
-  // Create a mutex for logging 
-  xLogMutex = xSemaphoreCreateMutex(); 
-  // Create a binary semaphore for button
-  xButtonSemaphore = xSemaphoreCreateBinary();
-  xLEDTimerMutex = xSemaphoreCreateBinary(); // Mutex for LED timer
   app_main();
 
   /* Start the FreeRTOS scheduler */
@@ -95,9 +76,10 @@ static void MX_GPIO_Init(void){
 
   /* GPIO Port A clock enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOC_CLK_ENABLE();
 
   /*Configure GPIO pin : GPIO_PIN_0 (PA0) */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Pin = BUTTON_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
@@ -108,6 +90,14 @@ static void MX_GPIO_Init(void){
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  // Initialize PC13
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+  GPIO_InitStruct.Pin = BUILTIN_LED_PIN;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
