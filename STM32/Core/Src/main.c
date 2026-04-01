@@ -2,6 +2,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 #include <semphr.h>
+#include <stdio.h>
 
 #define LED_PIN GPIO_PIN_7
 #define BUTTON_PIN GPIO_PIN_0
@@ -16,6 +17,20 @@ extern void app_main(void);
 // Binary semaphore for button press (if needed in the future)
 // xSemaphoreHandle xButtonSemaphore;
 extern SemaphoreHandle_t xButtonSemaphore;
+
+/**
+ * @brief Retargets the C library printf function to the USART.
+ * @param file: file descriptor
+ * @param ptr: pointer to data
+ * @param len: length of data
+ * @retval length of data
+ */
+int _write(int file, char *ptr, int len)
+{
+  (void)file;
+  HAL_UART_Transmit(&huart1, (uint8_t *)ptr, len, HAL_MAX_DELAY);
+  return len;
+}
 
 /**
   * @brief  The hardware entry point.
@@ -51,7 +66,7 @@ int main(void)
 /**
  * UART setting init function (for debugging purposes) 
  */
-static void MX_USART1_UART_Init(void)
+void MX_USART1_UART_Init(void)
 {
   /* Standard UART initialization code for STM32F103 */
   huart1.Instance = USART1;
@@ -73,7 +88,7 @@ static void MX_USART1_UART_Init(void)
  * @param None
  * Config the GPIO pins with IRQ enabled for button input (if needed in the future) 
  */
-static void MX_GPIO_Init(void){
+void MX_GPIO_Init(void){
 
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
@@ -95,7 +110,6 @@ static void MX_GPIO_Init(void){
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   // Initialize PC13
-  GPIO_InitTypeDef GPIO_InitStruct = {0};
   GPIO_InitStruct.Pin = BUILTIN_LED_PIN;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
@@ -103,7 +117,7 @@ static void MX_GPIO_Init(void){
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0); // Set priority lower than MAX_SYSCALL_INTERRUPT_PRIORITY
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
 }

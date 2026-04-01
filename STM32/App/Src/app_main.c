@@ -1,5 +1,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
+#include "queue.h"
+#include "timers.h"
 #include "stm32f1xx_hal.h"
 #include <stdio.h>
 #include "main.h"
@@ -123,14 +125,17 @@ static void vConsumerTask(void *pvParameters) {
  */
 // Button with debounce handler
 static void vButtonHandler(void *pvParameters){
-    //turn on/off a LED when button is pressed == semaphore is given
-    if(xSemaphoreTake(xButtonSemaphore, portMAX_DELAY) == pdTRUE){
-        vTaskDelay(pdMS_TO_TICKS(50)); // Debounce delay
-        // Wait until the button is released
-        while(HAL_GPIO_ReadPin(GPIOA, BUTTON_PIN) == GPIO_PIN_RESET){
-            vTaskDelay(pdMS_TO_TICKS(10)); // Polling delay
+    for(;;)
+    {
+        //turn on/off a LED when button is pressed == semaphore is given
+        if(xSemaphoreTake(xButtonSemaphore, portMAX_DELAY) == pdTRUE){
+            vTaskDelay(pdMS_TO_TICKS(50)); // Debounce delay
+            // Wait until the button is released
+            while(HAL_GPIO_ReadPin(GPIOA, BUTTON_PIN) == GPIO_PIN_RESET){
+                vTaskDelay(pdMS_TO_TICKS(10)); // Polling delay
+            }
+            vCommandBlinkHandler();
         }
-        vCommandBlinkHandler();
     }
 }
 
@@ -153,24 +158,35 @@ static void vOverflowTask(void *pvParameters)
  * delete it afterwards for clean up
  */
 static void vlowPriorityTask(void *pvParameters){
-    // Take the mutex
-    xSemaphoreTake(xtestMutex, portMAX_DELAY);
-    vLog("Low priority task has taken the mutex\n");
-    HAL_Delay(5000); // Simulate doing some work while holding the mutex for 5 seconds
-    xSemaphoreGive(xtestMutex);
+    for(;;){
+        // Take the mutex
+        if(xSemaphoreTake(xtestMutex, portMAX_DELAY) == pdTRUE){
+            vLog("Low priority task has taken the mutex\n");
+            HAL_Delay(5000); // Simulate doing some work while holding the mutex for 5 seconds
+            xSemaphoreGive(xtestMutex);
+            vTaskDelay(pdMS_TO_TICKS(1000)); // Sleep after releasing
+        }
+    }
 }
 static void vmediumPriorityTask(void *pvParameters){
     vTaskDelay(pdMS_TO_TICKS(100)); // Ensure low priority task runs first and takes the mutex
     //after suspend
     vLog("Medium priority task is running\n");
-    for(;;){} // Block the task indefinitely to simulate it being active and preventing the low priority task from runningdaj 
+    for(;;){
+        // Simulate medium priority task doing some work
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    } // Block the task indefinitely to simulate it being active and preventing the low priority task from runningdaj 
 }
 static void vhighPriorityTask(void *pvParameters){
-    vTaskDelay(pdMS_TO_TICKS(100)); // Ensure low priority task runs first and takes the mutex
-    vLog("High priority task is trying to take the mutex\n");
-    xSemaphoreTake(xtestMutex, portMAX_DELAY);
-    vLog("High priority task has taken the mutex\n");
-    xSemaphoreGive(xtestMutex);
+    for(;;){
+        vTaskDelay(pdMS_TO_TICKS(100)); // Ensure low priority task runs first and takes the mutex
+        vLog("High priority task is trying to take the mutex\n");
+        if(xSemaphoreTake(xtestMutex, portMAX_DELAY) == pdTRUE){
+            vLog("High priority task has taken the mutex\n");
+            xSemaphoreGive(xtestMutex);
+            vTaskDelay(pdMS_TO_TICKS(2000)); // Sleep after releasing
+        }
+    }
 }
 
 /**
