@@ -8,8 +8,8 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/App/Src/app_main.c" "CMakeFiles/stm32f103c8-freertos-template.elf.dir/App/Src/app_main.c.obj" "gcc" "CMakeFiles/stm32f103c8-freertos-template.elf.dir/App/Src/app_main.c.obj.d"
-  "/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Core/Src/main.c" "CMakeFiles/stm32f103c8-freertos-template.elf.dir/Core/Src/main.c.obj" "gcc" "CMakeFiles/stm32f103c8-freertos-template.elf.dir/Core/Src/main.c.obj.d"
+  "/home/chinhtran/Learning/Embedded/FreeRTOS/STM32/App/Src/app_main.c" "CMakeFiles/stm32f103c8-freertos-template.elf.dir/App/Src/app_main.c.obj" "gcc" "CMakeFiles/stm32f103c8-freertos-template.elf.dir/App/Src/app_main.c.obj.d"
+  "/home/chinhtran/Learning/Embedded/FreeRTOS/STM32/Core/Src/main.c" "CMakeFiles/stm32f103c8-freertos-template.elf.dir/Core/Src/main.c.obj" "gcc" "CMakeFiles/stm32f103c8-freertos-template.elf.dir/Core/Src/main.c.obj.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

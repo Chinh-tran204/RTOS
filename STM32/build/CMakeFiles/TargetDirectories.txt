@@ -1,3 +1,3 @@
-/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/build/CMakeFiles/stm32f103c8-freertos-template.elf.dir
-/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/build/CMakeFiles/edit_cache.dir
-/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/build/CMakeFiles/rebuild_cache.dir
+/home/chinhtran/Learning/Embedded/FreeRTOS/STM32/build/CMakeFiles/stm32f103c8-freertos-template.elf.dir
+/home/chinhtran/Learning/Embedded/FreeRTOS/STM32/build/CMakeFiles/edit_cache.dir
+/home/chinhtran/Learning/Embedded/FreeRTOS/STM32/build/CMakeFiles/rebuild_cache.dir
