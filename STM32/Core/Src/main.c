@@ -1,19 +1,14 @@
 #include "main.h"
-#include "FreeRTOS.h"
-#include "task.h"
-#include <semphr.h>
-#include <stdio.h>
 
-#define LED_PIN GPIO_PIN_7
-#define BUTTON_PIN GPIO_PIN_0
-#define BUILTIN_LED_PIN GPIO_PIN_13
 
 UART_HandleTypeDef huart1;
+TIM_HandleTypeDef htim2;
 
 
 /* Forward declaration for the application's main entry */
 extern void app_main(void);
-
+extern HAL_StatusTypeDef sensorCalibrate(void);
+extern xEventGroupHandle_t xInitializeCheckList; // For testing event group
 // Binary semaphore for button press (if needed in the future)
 // xSemaphoreHandle xButtonSemaphore;
 extern SemaphoreHandle_t xButtonSemaphore;
@@ -48,6 +43,8 @@ int main(void)
 
   // Init uart
   MX_USART1_UART_Init();
+  //set event group
+  xEventGroupSetBits(xInitializeCheckList, UART_INIT);      
   /* Initialize all configured peripherals */
   /* In production, UARTs, I2Cs, SPIs etc. are initialized here or in app_main() */
 
@@ -147,6 +144,86 @@ void SystemClock_Config(void)
 {
   /* Standard 72MHz configuration for STM32F103-C8-T6 (Blue Pill) */
   /* In a real project, this would include PLL, HSE, and HCLK settings */
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInit = {0};
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
+  RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+  RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
+  RCC_OscInitStruct.LSEState = RCC_LSE_ON;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  static void MX_TIM2_Init(void)
+  {
+
+    /* USER CODE BEGIN TIM1_Init 0 */
+
+    /* USER CODE END TIM1_Init 0 */
+
+    TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+    TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+    /* USER CODE BEGIN TIM1_Init 1 */
+
+    /* USER CODE END TIM1_Init 1 */
+    htim2.Instance = TIM1;
+    htim2.Init.Prescaler = 72-1;
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 65535-1;
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    htim2.Init.RepetitionCounter = 0;
+    htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+    if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+    {
+      Error_Handler();
+    }
+    sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+    if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+    {
+      Error_Handler();
+    }
+    sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+    sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+    if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+    {
+      Error_Handler();
+    }
+    /* USER CODE BEGIN TIM1_Init 2 */
+
+    /* USER CODE END TIM1_Init 2 */
+
+  }
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC|RCC_PERIPHCLK_ADC;
+  PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
+  PeriphClkInit.AdcClockSelection = RCC_ADCPCLK2_DIV6;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 // No need for receiving for now cause nothing get to recive, but this is how it would look like if we want to use it in the future
 // void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size){

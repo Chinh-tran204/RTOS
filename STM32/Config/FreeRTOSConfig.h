@@ -26,7 +26,7 @@
 #define configUSE_MALLOC_FAILED_HOOK             1
 #define configUSE_APPLICATION_TASK_TAG           0
 #define configUSE_COUNTING_SEMAPHORES            1
-#define configGENERATE_RUN_TIME_STATS            0
+#define configGENERATE_RUN_TIME_STATS            1
 #define configSUPPORT_STATIC_ALLOCATION          1
 #define configSUPPORT_DYNAMIC_ALLOCATION         1
 /* Co-routine definitions. */
@@ -67,5 +67,12 @@ to exclude the API function. */
 #define vPortSVCHandler     SVC_Handler
 #define xPortPendSVHandler  PendSV_Handler
 #define xPortSysTickHandler SysTick_Handler
+
+/* User-defined functions */
+extern void sysHighClock(void);
+extern uint32_t getSystemTicks(void);
+// Clock re-config for system profiling
+#define configCONFIGURE_TIMER_FOR_RUN_TIME_STATS() sysHighClock()
+#define configGET_RUN_TIME_COUNTER_VALUE() getSystemTicks()
 
 #endif /* FREERTOS_CONFIG_H */

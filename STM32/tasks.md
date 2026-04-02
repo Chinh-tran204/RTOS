@@ -54,5 +54,5 @@ Create a task that only executes when three different conditions are met (e.g., 
 *   **Goal:** Master multi-event synchronization using `xEventGroupWaitBits`.
 
 ### Task 10: Performance Profiling
-Enable `configGENERATE_RUN_TIME_STATS` in `FreeRTOSConfig.h`. Implement a task that prints a table to the UART showing every task's name, state, priority, and the percentage of total CPU time it has consumed.
+Enable `configGENERATE_RUN_TIME_STATS` in `FreeRTOSConfig.h`. Implement a task that prints a table to the UART showing every task's name, state, priority, and the percentage of total CPU time it has consumed.    
 *   **Goal:** Learn how to profile and optimize a real-time system.

@@ -1,18 +1,12 @@
-#include "FreeRTOS.h"
-#include "task.h"
-#include "queue.h"
 #include "timers.h"
-#include "stm32f1xx_hal.h"
-#include <stdio.h>
 #include "main.h"
-#include <string.h>
-#include <semphr.h>
 
 #define LED_PIN GPIO_PIN_7
 #define BUTTON_PIN GPIO_PIN_0
 #define BUILTIN_LED_PIN GPIO_PIN_13
 
 extern UART_HandleTypeDef huart1;
+extern TIM_HandleTypeDef htim2;
 //Queue handle for testing purposes
 QueueHandle_t xQueue;
 // Mutex for Logging
@@ -22,6 +16,7 @@ xSemaphoreHandle_t xtestMutex; // for testing purposes, delete it later
 SemaphoreHandle_t xButtonSemaphore;
 // Timer for blinking LED handle
 xTimerHandle_t xBlinkTimer;
+xEventGroupHandle_t xInitializeCheckList; // For testing event group, delete it later
 
 
 // Static task allocation
@@ -68,6 +63,18 @@ void vCommandBlinkHandler(void)
     }
 }
 
+HAL_StatusTypeDef sensorCalibrate(void){
+    // Simulate sensor calibration
+    vLog("Calibrating sensor...\n");
+    HAL_Delay(1000); // Simulate time-consuming calibration
+    xEventGroupSetBits(xInitializeCheckList, SENSOR_INIT); // Set the event bit for sensor initialization
+    return HAL_OK;
+}
+
+int sensorRead(void){
+    return rand() % 100; // Simulate reading a sensor value (0-99)
+}
+
 /********************************************************** TASK HANDLE **************************************************/
 /**
  * @brief Heartbeat Task
@@ -95,14 +102,15 @@ static void vHeartbeatTask(void *pvParameters)
  * @brief Producer task (for testing purposes)
  * This task read info from dummy sensor and update the queue every 1 second.
  */
-
 static void vProducerTask(void *pvParameters)
 {
-    int dummy_sensor_value = 0;
+    sensorCalibrate(); // Simulate sensor calibration at startup
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second before starting the loop
+    int sensor_value = sensorRead();
     for(;;){
-        dummy_sensor_value++; // Simulate reading from a sensor
+        sensor_value = sensorRead(); // Simulate reading from a sensor
         //update value to queue
-        xQueueSend(xQueue, &dummy_sensor_value, portMAX_DELAY);
+        xQueueSend(xQueue, &sensor_value, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(1000)); // Delay for 1 second
     }
 }
@@ -118,13 +126,11 @@ static void vConsumerTask(void *pvParameters) {
     }
 }
 
-
-
 /**
  * @brief Handler GPIO task
  */
 // Button with debounce handler
-static void vButtonHandler(void *pvParameters){
+static void vButtonHandlerTask(void *pvParameters){
     for(;;)
     {
         //turn on/off a LED when button is pressed == semaphore is given
@@ -189,12 +195,61 @@ static void vhighPriorityTask(void *pvParameters){
     }
 }
 
+static void vSystemCheckTask(void *pvParameters){
+    const EventBits_t xBitsToWaitFor = UART_INIT | SENSOR_INIT | USER_LOGIN;
+    xEventGroupWaitBits(
+        xInitializeCheckList,
+        xBitsToWaitFor,
+        pdFALSE, // Don't clear bits on exit
+        pdTRUE,  // Wait for all bits
+        portMAX_DELAY //wait forever for this to happen
+    );
+    vLog("All system components initialized. System check passed!\n");
+    vTaskDelete(NULL); // Delete this task after the check is done
+}
+
+static void vSystemReportTask(void *pvParameters){
+    //refresh time stay at 1 second
+    //lend space for task, task struct
+    uint32_t RunTime;
+    if(taskStatusArray != NULL){
+        for(;;){
+            vLog("[LOG]SYSTEM_STATE_RP\n");
+            //count the task
+            UBaseType_t tasks = uxTaskGetNumberOfTasks();
+            //get the system state
+            TaskStatus_t *taskStatusArray = pvPortMalloc(tasks * sizeof(TaskStatus_t));
+            tasks = uxTaskGetSystemState(taskStatusArray, tasks, &RunTime);
+            //print the system state
+            for(UBaseType_t i = 0; i < tasks; i++){
+                if(Runtime > 0){
+                    uint32_t taskRunTime = taskStatusArray[i].ulRunTimeCounter;     //take task specify runtime
+                    uint32_t taskCPUPercentage = (taskRunTime * 100UL) / RunTime; //calculate the percentage
+                } else{
+                    uint32_t taskCPUPercentage = 0; // Avoid division by zero
+                }
+                char log_msg[100];
+                snprintf(log_msg, sizeof(log_msg), "Task: %s, State: %u, Priority: %u, CPU Usage: %lu%%\n\r", 
+                        taskStatusArray[i].pcTaskName, 
+                        taskStatusArray[i].eCurrentState, 
+                        taskStatusArray[i].uxCurrentPriority, 
+                        taskCPUPercentage);
+                vLog(log_msg);
+                vPortFree(taskStatusArray); // Free the allocated memory after use
+            }   
+            //delay for refresh time
+            vTaskDelay(pdMS_TO_TICKS(SYS_RP_RFTIM));
+        }
+    }    
+}
 /**
  * @brief Application Main Entry
  * This function initializes tasks and starts the scheduler.
  */
 void app_main(void)
 {
+    // Set the user setting event group
+    xEventGroupSetBits(xInitializeCheckList, USER_LOGIN); 
     // Create a queue to hold 2 integers
     xQueue = xQueueCreate(2, sizeof(int));
     // Create a mutex for logging 
@@ -213,8 +268,19 @@ void app_main(void)
     );
 
     /* Create application tasks */
-    xTaskCreateStatic(
-                vHeartbeatTask, 
+    xTaskCreate(vSystemReportTask, 
+                "SystemReport", 
+                configMINIMAL_STACK_SIZE * 2, 
+                NULL, 
+                4, 
+                NULL);
+    xTaskCreate(vSystemCheckTask, 
+                "SystemCheck", 
+                configMINIMAL_STACK_SIZE, 
+                NULL, 
+                1, 
+                NULL);
+    xTaskCreateStatic(vHeartbeatTask, 
                 "Heartbeat", 
                 configMINIMAL_STACK_SIZE, 
                 NULL, 
@@ -233,7 +299,7 @@ void app_main(void)
                 NULL, 
                 1, 
                 NULL);
-    xTaskCreate(vButtonHandler, 
+    xTaskCreate(vButtonHandlerTask, 
                 "ButtonHandler", 
                 configMINIMAL_STACK_SIZE, 
                 NULL, 
@@ -332,3 +398,16 @@ void vApplicationGetTimerTaskMemory( StaticTask_t **ppxTimerTaskTCBBuffer,
     *pulTimerTaskStackSize   = configTIMER_TASK_STACK_DEPTH; 
 }
 
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void sysHighClock(void){
+    //start up the cloc for system profiling
+    HAL_TIM_Base_Start(&htim2);
+}
+
+uint32_t getSystemTicks(void){
+    return TIM2->CNT; // Return the current value of the timer counter
+}
