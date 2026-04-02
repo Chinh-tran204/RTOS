@@ -1,6 +1,7 @@
 #include "main.h"
 #include "FreeRTOS.h"
 #include "task.h"
+#include <semphr.h>
 
 #define LED_PIN GPIO_PIN_7
 #define BUTTON_PIN GPIO_PIN_0
@@ -14,6 +15,7 @@ extern void app_main(void);
 
 // Binary semaphore for button press (if needed in the future)
 // xSemaphoreHandle xButtonSemaphore;
+extern SemaphoreHandle_t xButtonSemaphore;
 
 /**
   * @brief  The hardware entry point.
@@ -27,9 +29,10 @@ int main(void)
 
   /* Configure the system clock to 72MHz (Standard for STM32F103) */
   SystemClock_Config();
+  MX_GPIO_Init();
 
   // Init uart
-  MX_UART1_UART_Init();
+  MX_USART1_UART_Init();
   /* Initialize all configured peripherals */
   /* In production, UARTs, I2Cs, SPIs etc. are initialized here or in app_main() */
 

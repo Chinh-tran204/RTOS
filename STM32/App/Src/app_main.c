@@ -15,7 +15,7 @@ extern UART_HandleTypeDef huart1;
 QueueHandle_t xQueue;
 // Mutex for Logging
 xSemaphoreHandle_t xLogMutex;
-xsemaphoreHandle_t xtestMutex; // for testing purposes, delete it later
+xSemaphoreHandle_t xtestMutex; // for testing purposes, delete it later
 // Binary Semaphore for button press
 SemaphoreHandle_t xButtonSemaphore;
 // Timer for blinking LED handle
@@ -64,12 +64,6 @@ void vCommandBlinkHandler(void)
         xTimerStart(xBlinkTimer, 0);
         vLog("Blink Timer Started\n");
     }
-}
-
-// Array creation function for testing purposes
-int* arr(size_t size_of_arr)
-{
-    return malloc(size_of_arr * sizeof(int));
 }
 
 /********************************************************** TASK HANDLE **************************************************/
@@ -148,7 +142,7 @@ static void vButtonHandler(void *pvParameters){
  */
 static void vOverflowTask(void *pvParameters)
 {
-    int* big_array = arr(1000); // Allocate a large array to cause stack overflow
+    int arr[256]; // Large array to quickly consume stack space
     for(;;){}
 }
 
@@ -161,21 +155,21 @@ static void vOverflowTask(void *pvParameters)
 static void vlowPriorityTask(void *pvParameters){
     // Take the mutex
     xSemaphoreTake(xtestMutex, portMAX_DELAY);
-    vlog("Low priority task has taken the mutex\n");
+    vLog("Low priority task has taken the mutex\n");
     HAL_Delay(5000); // Simulate doing some work while holding the mutex for 5 seconds
     xSemaphoreGive(xtestMutex);
 }
 static void vmediumPriorityTask(void *pvParameters){
     vTaskDelay(pdMS_TO_TICKS(100)); // Ensure low priority task runs first and takes the mutex
     //after suspend
-    vlog("Medium priority task is running\n");
+    vLog("Medium priority task is running\n");
     for(;;){} // Block the task indefinitely to simulate it being active and preventing the low priority task from runningdaj 
 }
 static void vhighPriorityTask(void *pvParameters){
     vTaskDelay(pdMS_TO_TICKS(100)); // Ensure low priority task runs first and takes the mutex
-    vlog("High priority task is trying to take the mutex\n");
+    vLog("High priority task is trying to take the mutex\n");
     xSemaphoreTake(xtestMutex, portMAX_DELAY);
-    vlog("High priority task has taken the mutex\n");
+    vLog("High priority task has taken the mutex\n");
     xSemaphoreGive(xtestMutex);
 }
 
@@ -229,13 +223,12 @@ void app_main(void)
                 NULL, 
                 1, 
                 NULL);
-    xTaskCreate(OverflowTask,
+    xTaskCreate(vOverflowTask,
                 "Overflowstack",
-                32,
+                ((unsigned short)100), //60-70 for initiate the task, 100 for overflow
                 NULL,
                 1,
-                NULL
-    )
+                NULL);
     // Tasks for testing priority inversion
     xTaskCreate(vlowPriorityTask, 
                 "LowPriority", 
@@ -269,8 +262,10 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
     // Disable the task or interrupt it for safe
     taskDISABLE_INTERRUPTS();
     // log the things
-    vlog("Fatal Error: Stack overflow!!!\n\r");
-    vlog("Stack overflow in task: %s\n\r", pcTaskName);
+    vLog("Fatal Error: Stack overflow!!!\n\r");
+    char log_msg[50];
+    snprintf(log_msg, sizeof(log_msg), "Stack overflow in task: %s\n\r", pcTaskName);
+    vLog(log_msg);
     while(1){
         HAL_GPIO_TogglePin(GPIOC, BUILTIN_LED_PIN);
         HAL_Delay(100); // Blink every 100ms to indicate error state
