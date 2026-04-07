@@ -1,0 +1,14 @@
+[
+{
+  "directory": "/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/build",
+  "command": "/opt/ST/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gcc -DSTM32F103xB -DUSE_HAL_DRIVER -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Core/Inc -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/App/Inc -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Config -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Drivers/CMSIS/Device/ST/STM32F1xx/Include -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Drivers/CMSIS/Include -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Drivers/STM32F1xx_HAL_Driver/Inc -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Middlewares/Third_Party/FreeRTOS/Source/include -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM3 -mthumb -mcpu=cortex-m3 -g -std=gnu11 -mthumb -mcpu=cortex-m3 -Wall -Wextra -Wpedantic -Wno-unused-parameter -ffunction-sections -fdata-sections -g3 -Og -DDEBUG -o CMakeFiles/stm32f103c8-freertos-template.elf.dir/Core/Src/main.c.obj -c /Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Core/Src/main.c",
+  "file": "/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Core/Src/main.c",
+  "output": "CMakeFiles/stm32f103c8-freertos-template.elf.dir/Core/Src/main.c.obj"
+},
+{
+  "directory": "/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/build",
+  "command": "/opt/ST/STM32CubeCLT_1.18.0/GNU-tools-for-STM32/bin/arm-none-eabi-gcc -DSTM32F103xB -DUSE_HAL_DRIVER -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Core/Inc -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/App/Inc -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Config -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Drivers/CMSIS/Device/ST/STM32F1xx/Include -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Drivers/CMSIS/Include -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Drivers/STM32F1xx_HAL_Driver/Inc -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Middlewares/Third_Party/FreeRTOS/Source/include -I/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/Middlewares/Third_Party/FreeRTOS/Source/portable/GCC/ARM_CM3 -mthumb -mcpu=cortex-m3 -g -std=gnu11 -mthumb -mcpu=cortex-m3 -Wall -Wextra -Wpedantic -Wno-unused-parameter -ffunction-sections -fdata-sections -g3 -Og -DDEBUG -o CMakeFiles/stm32f103c8-freertos-template.elf.dir/App/Src/app_main.c.obj -c /Users/chinhtranhuu/Personal/GIT/RTOS/STM32/App/Src/app_main.c",
+  "file": "/Users/chinhtranhuu/Personal/GIT/RTOS/STM32/App/Src/app_main.c",
+  "output": "CMakeFiles/stm32f103c8-freertos-template.elf.dir/App/Src/app_main.c.obj"
+}
+]

@@ -2,8 +2,12 @@
 
 
 UART_HandleTypeDef huart1;
+SPI_HandleTypeDef hspi1;
 TIM_HandleTypeDef htim2;
 
+// Data buffer section
+char spi1_Buffer[SPI_BUFFER_MIN]; 
+memset(spi1_Buffer, '\0', SPI_BUFFER_MIN);
 
 /* Forward declaration for the application's main entry */
 extern void app_main(void);
@@ -12,6 +16,8 @@ extern xEventGroupHandle_t xInitializeCheckList; // For testing event group
 // Binary semaphore for button press (if needed in the future)
 // xSemaphoreHandle xButtonSemaphore;
 extern SemaphoreHandle_t xButtonSemaphore;
+// xSPISemaphore for spi command saving
+extern SemaphoreHandle_t xSPISemaphore;
 
 /**
  * @brief Retargets the C library printf function to the USART.
@@ -43,11 +49,14 @@ int main(void)
 
   // Init uart
   MX_USART1_UART_Init();
+  MX_SPI1_Init();
   //set event group
-  xEventGroupSetBits(xInitializeCheckList, UART_INIT);      
+  xEventGroupSetBits(xInitializeCheckList, UART_INIT); 
+  xEventGroupSetBits(xInitializeCheckList, SPI_INIT);      
   /* Initialize all configured peripherals */
   /* In production, UARTs, I2Cs, SPIs etc. are initialized here or in app_main() */
-
+  // turn on SPI recieve with Interupt
+  HAL_SPI_Receive_IT(&hspi1, (uint8_t *) spi1_buffer, SPI_BUFFER_MIN);
   /* Call the application-specific setup */
   app_main();
 
@@ -79,6 +88,30 @@ void MX_USART1_UART_Init(void)
     Error_Handler();
   }
 }
+
+/**
+ * @brief SPI init
+ * for SPI initialize and capture
+ */
+void MX_SPI1_Init(void){
+  /* SPI2 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_SLAVE;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+} 
 
 /** 
  * @brief GPIO init config
@@ -134,6 +167,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
   }
 
+}
+
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi){
+  if(hspi -> Instance == &hspi1){
+    //trigger a flag here ; give the semaphore to save the command
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xSemaphoreGiveFromISR(xSPISemaphore, &xHigherPriorityTaskWoken);
+    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    // Re-Initiate SPI receive
+    HAL_SPI_Receive_IT(&hspi1, (uint8_t *) spi1_buffer, SPI_BUFFER_MIN);
+  }
 }
 
 /**

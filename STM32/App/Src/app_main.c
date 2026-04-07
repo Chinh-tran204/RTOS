@@ -14,6 +14,8 @@ xSemaphoreHandle_t xLogMutex;
 xSemaphoreHandle_t xtestMutex; // for testing purposes, delete it later
 // Binary Semaphore for button press
 SemaphoreHandle_t xButtonSemaphore;
+// Binary semaphore for spi command saving
+SemaphoreHandle_t xSPISemaphore;
 // Timer for blinking LED handle
 xTimerHandle_t xBlinkTimer;
 xEventGroupHandle_t xInitializeCheckList; // For testing event group, delete it later
@@ -22,6 +24,21 @@ xEventGroupHandle_t xInitializeCheckList; // For testing event group, delete it 
 // Static task allocation
 static StaticTask_t xHeartbeatTaskTCB;
 static StackType_t xHeartbeatTaskStack[configMINIMAL_STACK_SIZE];
+
+// Command stack buffer
+static char* SPI_CommandBuffer = calloc(SPI_BUFFER_MIN, sizeof(char)); // Buffer for SPI commands
+static int SPI_CommandBufferStackSize = 0; // Stack size for the SPI command buffer task
+static uint8_t SPICommandCounter = 0; // Counter for the number of SPI commands received
+CommandType CommandInput = NONE; // Enum for command type, to be used in command processing
+// //command msg
+// const char* CMD[] = {
+//     "READ_STATUS",
+//     "SET_LED",
+//     "SET_FRED",
+//     "READ_SENSOR",
+//     "READ_CONFIG",
+//     "SET_CONFIG"
+// };
 /********************************************************** BASIC FUNCTIONS **************************************************/
 
 /**
@@ -153,50 +170,84 @@ static void vButtonHandlerTask(void *pvParameters){
  */
 static void vOverflowTask(void *pvParameters)
 {
-    int arr[256]; // Large array to quickly consume stack space
+    int arr[10]; // Large array to quickly consume stack space
     for(;;){}
 }
 
 
 /**
- * @brief Task for testing priority inversion
- * all task after this section is for testing and have no real purpose
- * delete it afterwards for clean up
+ * @brief SPI command saving handler
  */
-static void vlowPriorityTask(void *pvParameters){
+static void vSPIHandlerTask(void *pvParameters){
     for(;;){
-        // Take the mutex
-        if(xSemaphoreTake(xtestMutex, portMAX_DELAY) == pdTRUE){
-            vLog("Low priority task has taken the mutex\n");
-            HAL_Delay(5000); // Simulate doing some work while holding the mutex for 5 seconds
-            xSemaphoreGive(xtestMutex);
-            vTaskDelay(pdMS_TO_TICKS(1000)); // Sleep after releasing
-        }
+        if(xSemaphoreTake(xSPISemaphore, portMAX_DELAY) == pdTRUE){
+            //check if the command can be save or not
+            SPI_CommandBufferStackSize += strlen(spi1_buffer) + SEPARATOR_SIZE + NULL_TERMINATOR_SIZE;
+            if(SPI_CommandBufferStackSize > SPI_BUFFER_MIN){
+                realloc(SPI_CommandBuffer, SPI_CommandBufferStackSize);   
+            }
+            strcat(SPI_CommandBuffer, SEPARATOR); // Add a separator before the new command
+            strcat(SPI_CommandBuffer, spi1_buffer); // Append the new command to the buffer
+            SPICommandCounter++;
+            memset(spi1_buffer, '\0', SPI_BUFFER_MIN); // Clear the SPI buffer for the next command
     }
 }
-static void vmediumPriorityTask(void *pvParameters){
-    vTaskDelay(pdMS_TO_TICKS(100)); // Ensure low priority task runs first and takes the mutex
-    //after suspend
-    vLog("Medium priority task is running\n");
-    for(;;){
-        // Simulate medium priority task doing some work
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    } // Block the task indefinitely to simulate it being active and preventing the low priority task from runningdaj 
-}
-static void vhighPriorityTask(void *pvParameters){
-    for(;;){
-        vTaskDelay(pdMS_TO_TICKS(100)); // Ensure low priority task runs first and takes the mutex
-        vLog("High priority task is trying to take the mutex\n");
-        if(xSemaphoreTake(xtestMutex, portMAX_DELAY) == pdTRUE){
-            vLog("High priority task has taken the mutex\n");
-            xSemaphoreGive(xtestMutex);
-            vTaskDelay(pdMS_TO_TICKS(2000)); // Sleep after releasing
+
+// SPI command process task
+static void vSPISlaveTask(void *pvParameters){
+    for(;;){ 
+        while(SPICommandCounter > 0){
+            //find the seperator
+            char* separatorIndicator = strstr(SPI_CommandBuffer, SEPARATOR);
+            if(separatorIndicator == NULL){
+                vlog("Error: Command separator not found in SPI command buffer\n");
+                break;
+            }
+            //take the command from the buffer
+            char command[50];
+            memset(command, '\0', sizeof(command)); // Clear the command buffer
+            strncpy(command, SPI_CommandBuffer, separatorIndicator - SPI_CommandBuffer);
+            //process the command
+            switch(command){
+                case "READ_STATUS":
+                    //read status and do something
+                    CommandInput = READ_STATUS;
+                    break;
+                case "SET_LED":
+                    //set led and do something
+                    CommandInput = SET_LED;
+                    break;
+                case "SET_FRED":
+                    //set fred and do something
+                    CommandInput = SET_FRED;
+                    break;
+                case "READ_SENSOR":
+                    //read sensor and do something
+                    CommandInput = READ_SENSOR;
+                    break;
+                case "READ_CONFIG":
+                    //read config and do something
+                    CommandInput = READ_CONFIG;
+                    break;
+                case "SET_CONFIG":
+                    //set config and do something
+                    CommandInput = SET_CONFIG;
+                    break;
+                default:
+                    break;
+            }
+            // Pop the command form the buffer
+            if(separatorIndicator - SPI_CommandBuffer > SPI)
+            SPI_CommandBufferStackSize -= (separatorIndicator - SPI_CommandBuffer) - SEPARATOR_SIZE;
+            memmove(SPI_CommandBuffer, separatorIndicator + SEPARATOR_SIZE, SPI_CommandBufferStackSize);
+            realloc(SPI_CommandBuffer, SPI_CommandBufferStackSize);
+            SPICommandCounter--;
         }
     }
 }
 
 static void vSystemCheckTask(void *pvParameters){
-    const EventBits_t xBitsToWaitFor = UART_INIT | SENSOR_INIT | USER_LOGIN;
+    const EventBits_t xBitsToWaitFor = UART_INIT | SENSOR_INIT | SPI_INIT;
     xEventGroupWaitBits(
         xInitializeCheckList,
         xBitsToWaitFor,
@@ -249,7 +300,6 @@ static void vSystemReportTask(void *pvParameters){
 void app_main(void)
 {
     // Set the user setting event group
-    xEventGroupSetBits(xInitializeCheckList, USER_LOGIN); 
     // Create a queue to hold 2 integers
     xQueue = xQueueCreate(2, sizeof(int));
     // Create a mutex for logging 
@@ -258,6 +308,8 @@ void app_main(void)
     xtestMutex = xSemaphoreCreateMutex();
     // Create a binary semaphore for button
     xButtonSemaphore = xSemaphoreCreateBinary();
+    //Create a binary semaphore for the spi bus
+    xSPISemaphore = xSemaphoreCreateBinary();
     // Timer task for Blinking LED every 2 seconds
     xBlinkTimer = xTimerCreate(
         "BlinkTimer", 
@@ -305,30 +357,18 @@ void app_main(void)
                 NULL, 
                 1, 
                 NULL);
-    xTaskCreate(vOverflowTask,
-                "Overflowstack",
-                ((unsigned short)100), //60-70 for initiate the task, 100 for overflow
+    xTaskCreate(vSPISlaveTask,
+                "SPISlaveCommandProcess",
+                configMINIMAL_STACK_SIZE * 2, //60-70 for initiate the task, 100 for overflow
                 NULL,
                 1,
                 NULL);
     // Tasks for testing priority inversion
-    xTaskCreate(vlowPriorityTask, 
-                "LowPriority", 
-                configMINIMAL_STACK_SIZE, 
-                NULL, 
-                1, 
-                NULL);
-    xTaskCreate(vmediumPriorityTask, 
-                "MediumPriority", 
+    xTaskCreate(vSPIHandlerTask, 
+                "SPIHandler", 
                 configMINIMAL_STACK_SIZE, 
                 NULL, 
                 2, 
-                NULL);
-    xTaskCreate(vhighPriorityTask, 
-                "HighPriority", 
-                configMINIMAL_STACK_SIZE, 
-                NULL, 
-                3, 
                 NULL);
     /* In a production app, more tasks (e.g., UART communication, sensor reading) would be added here */
     /* The scheduler is started in the real main.c */
